@@ -10,6 +10,7 @@ my python was under python 313
 3. 使用pip install pandas
 
 ## 使用方法(Usage)
-因台灣證交所更新時間限制，在terminal 執行本程式即可自動儲存昨日的股票交易資訊。
+因台灣證交所資料更新時間限制，在terminal 執行本程式即可自動儲存昨日的股票交易資訊。
 
-第一版以json檔與csv檔做儲存。並存在與本程式同路徑中。
+第一版以json檔與csv檔做儲存。並存在與本程式同路徑中。下一版計畫更改成.db檔(SQL)
+
