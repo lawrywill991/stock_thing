@@ -15,6 +15,7 @@ def dowload_stock_day_all():
 
 #-----為了把Json檔轉成db檔節省空間，先寫這段去手動整合執行(一步一步來比較妥當，之後再用for迴圈練習自動整合好了)-------------------------
 #重設整個db檔的table(清空資料)
+#測試GitHub加一行註解來試試看好了
 def reset_table(empty_table):
      
      empty_db= ["Date","Code","Name","TradeVolume",
