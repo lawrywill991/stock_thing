@@ -1,140 +1,116 @@
 
+
+
 import requests as req
 import pandas as pd
 import json as js
-import sqlite3
+
 import os
+import datetime
+import sys
+# print(sys.executable)
 
-def dowload_stock_day_all():
-     trade_record=req.get("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",verify="D:/python/twse_openapi.pem")
-     print(trade_record)
-     today_df = pd.DataFrame(trade_record.json())
-     print(today_df['Date'].unique())
-     return today_df
 
-#-----為了把Json檔轉成db檔節省空間，先寫這段去手動整合執行(一步一步來比較妥當，之後再用for迴圈練習自動整合好了)-------------------------
-#重設整個db檔的table(清空資料)
-def reset_table(empty_table):
-     
-     empty_db= ["Date","Code","Name","TradeVolume",
-               "TradeValue","OpeningPrice",
-               "HighestPrice","LowestPrice",
-               "ClosingPrice","Change","Transaction"]
-     empty_df = pd.DataFrame(columns=empty_db)
-     with sqlite3.connect('stock.db') as conn:
-          empty_df.to_sql(empty_table,conn,if_exists='replace',index=False)
-          print(f'{empty_table}表格已重製，目前資料為空')
-     with sqlite3.connect('stock.db') as conn:
-          df = pd.read_sql_query(f'SELECT * FROM {empty_table}',con=conn)
-          print(df)
-#單純呼叫db的table，檢查檔案狀態用
-def check_table(table_name):
-     try:
-         with sqlite3.connect('stock.db') as conn:
-               df = pd.read_sql_query(f'SELECT * FROM {table_name} ',conn)
-               # print(df['Date'].unique())
-               print(f'{table_name}已有{df['Date'].unique()}資料合計{df['Date'].count()}筆')
-     except pd.errors.DatabaseError:
-           print(f'在stock_db中找不到{table_name} 表格')
+def find_key_series(data): #解出key_set(或稱key_series)
+    key_series=[]
+    for dict_list in data:
+        for keys in dict_list:
+            if keys not in key_series:
+                key_series.append(keys)
+    #print(key_set)
+    return key_series
 
-#檢查json檔與是否存在，並試圖整合進DB檔的table中
-def json_putinto_db(table_name,new_data):
-     databaseError = False
-     filenotFound = False
-     #------讀取stock.db檔的table----
-     try:
-           with sqlite3.connect('stock.db') as conn:
-                old_df = pd.read_sql_query(f'SELECT * FROM {table_name}',conn)
-           print(old_df.tail(2))
-     except pd.errors.DatabaseError:
-           print(f'在stock_db中找不到{table_name} 表格')
-           databaseError = True
-     
-     #------讀取json檔-----
-     json_locate = os.path.join(r'E:\證交所API',new_data)+'.json'
-     # print(json_locate)
-     # print(os.path.exists(json_locate))
-     try:
-         with open(json_locate,"r",encoding='utf-8') as f1:
-              data = js.load(f1)
-         new_df = pd.DataFrame(data)
-         print(new_df.tail(3))
-     except FileNotFoundError:
-          print(f'找不到{new_data}檔案')
-          filenotFound = True
-     #------整合df並選擇是否覆蓋存入-------
-     if databaseError or filenotFound :
-          print('df缺少,整合中止')
-     else:
-          if new_df['Date'].isin(old_df['Date']).any():
-               print('新df與舊df重複,中止combine')
-          else:
-               print('新df不存在於舊df中，開始整合')
-               combined_df = pd.concat([old_df,new_df],ignore_index=True)
-               print('整合完畢，頭尾顯示如下')
-               print(combined_df.head(1))
-               print(combined_df.tail(1))
-               save_db=input(f'是否覆蓋與存入{table_name}(Y/N)').upper()
-               if save_db == 'Y':
-                    combined_df.to_sql(table_name,conn,if_exists='replace',index=False)
-                    print(f'{new_data}加入stock.db檔的{table_name}table中')
-               else:
-                    print(f'stock.db檔未存入{new_data}')
+def find_value_set(data,key,key_set): #解出value_set
+    value_set=[]
+    if key in key_set:
+        for dict_list in data:
+            value=dict_list[key]
+            if value not in value_set:
+                value_set.append(value)
+        return value_set
+    else:
+        return False
 
-#將新下載的df整合進DB檔的table中
-def today_addinto_db(table_name,today_df):
-     tablenotfound = False
-     try:
-           with sqlite3.connect('stock.db') as conn:
-                old_df = pd.read_sql_query(f'SELECT * FROM {table_name}',conn)
-           print(old_df.tail(2))
-           pd.read_sql
+def find_value_series(data,key,key_set): #解出value_series
+    key_value_series=[]
+    if key in key_set:
+        for dict_list in data:
+            for keys in dict_list:
+                if keys == key: 
+                    value=dict_list[keys]
+                    key_value_series.append(value)
+        return key_value_series
+    else:
+        return False
 
-     except pd.errors.DatabaseError:
-           print(f'在stock.db中找不到{table_name} 表格')
-           tablenotfound = True
-     if tablenotfound:
-          print(f'stock.db沒有{table_name}表格,中止程式')
-     else:
-          if today_df['Date'].isin(old_df['Date']).any():
-               print('今日資料與舊df重複,中止整合')
-          else:
-               print('今日資料不存在於舊df中，開始整合')
-               combined_df = pd.concat([old_df,today_df],ignore_index=True)
-               print('整合完畢，頭尾顯示如下')
-               print(combined_df.head(1))
-               print(combined_df.tail(1))
-               save_db=input(f'是否覆蓋與存入{table_name}(Y/N)').upper()
-               if save_db == 'Y':
-                    combined_df.to_sql(table_name,conn,if_exists='replace',index=False)
-                    print(f'{today_df}加入stock.db檔的{table_name}table中')
-               else:
-                    print(f'stock.db檔未存入{today_df}')
+def transform_to_df(data,key_set): #把解成的key_set與value_series組成dict
+    transformed_data={}
+    for keys in key_set:
+        series =find_value_series(data,keys,key_set) 
+        transformed_dict = {keys:series}
+        transformed_data.update(transformed_dict)
+    # print(transformed_data)
+    return transformed_data
 
-if __name__ == '__main__':
-     # reset_table('stock_day_all')
+trade_record=req.get("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL",verify="D:/python/twse_openapi.pem")
+print(len(trade_record.text))
+print(trade_record) #顯示API連線狀態
+#print(type(trade_record.text))
 
-     # present_data = input('請輸入整合stock.db檔中的table名稱:')
-     # new_data = input('請輸入要加入的json檔名(E:\證交所API)')
-     # json_putinto_db(present_data,new_data)
+#---解析data區: 重點是把list[dict] 轉成dict{key:list} 可以直接給pd轉df用------
+data_list=js.loads(trade_record.text)#要給python解析前先用loads轉成正確資料型態:list
+keys=find_key_series(data_list)
+print(keys)
+    #---利用解析過程順便確認資料日期是否正確-----------
+data_date=find_value_set(data_list,'Date',keys)
+print(f"本次data的日期有{len(data_date)}種，{data_date}")
+if len(data_date) >1:
+    print("資料有問題，先關閉程式不存檔")
+    sys.exit(0)
+print(type(data_date))
+    #----這段轉成datetime的date類別其實沒做也可以運行拉，反正只是拿來當存檔檔名的。
+date_str =data_date[0]
+y = int(date_str[:3]) + 1911
+m = int(date_str[3:5])
+d = int(date_str[5:7])
+data_date=datetime.date(y,m,d)
+# print(f"本次資料內容為{data_date}的資料")
+    #----正式組合成dict{key:list}-------------
+tranformed_data = transform_to_df(data_list,keys)
+df=pd.DataFrame(tranformed_data)
+# print(df)
+df['TradeVolume']=pd.to_numeric(df['TradeVolume'],errors="coerce")
+df["TradeValue"]=pd.to_numeric(df['TradeVolume'],errors="coerce")
+df["OpeningPrice"]=pd.to_numeric(df['OpeningPrice'],errors="coerce")
+df["HighestPrice"]=pd.to_numeric(df['HighestPrice'],errors="coerce")
+df["LowestPrice"]=pd.to_numeric(df['LowestPrice'],errors="coerce")
+df["ClosingPrice"]=pd.to_numeric(df['ClosingPrice'],errors="coerce")
+df["Transaction"]=pd.to_numeric(df['Transaction'],errors="coerce")
+df["Change"]=pd.to_numeric(df['Change'],errors="coerce")
+df["Date"]=pd.to_numeric(df["Date"],errors="coerce")
+df["Date"]=df["Date"]+19110000
+df["Date"]=pd.to_datetime(df["Date"].astype(str),format="%Y%m%d",
+                          errors="coerce").dt.date
 
-     check_table_name = input('請輸入檢查stock.db檔的表格名稱:')
-     check_table(check_table_name)
+#------存檔區----要來解析data時直接用三引號全段註解掉就行---------
 
-     # present_data = input('請輸入整合stock.db檔中的table名稱:')
-     # today_df=dowload_stock_day_all()
-     # today_addinto_db(present_data,today_df)
-     leave_program=input('請按下enter結束程式:')
-#------以下是這程式第一版寫法(剛學到requests、pandas的時候寫的)-------------------------
+result_json = os.path.join(r'E:/證交所API',f'交易價量{data_date}.json')
+result_csv = os.path.join(r'E:/證交所API',f'交易價量{data_date}.csv')
+df=df
+
+if os.path.exists(result_json) or os.path.exists(result_csv) :
+    print('今天檔案已存在，程式結束')
+    exit(0)
+
 # 存成json格式檔
 
-#with open (f"E:/證交所API/交易價量{now}.json","a",encoding="UTF-8") as f:
-#    js.dump(trade_record.json(),f,ensure_ascii=False)
-
+with open (f"E:/證交所API/交易價量{data_date}.json","a",encoding="UTF-8") as f:
+    js.dump(trade_record.json(),f,ensure_ascii=False)
+"""
 #存成Excel檔 除了用pandas以外，還要pip openpyxl跟fsspec
-# today_record=pd.DataFrame(trade_record.json())
-# today_record.to_excel(f"D://python/{now}.xlsx",index=False,engine="openpyxl")
-
+df.to_excel(f"E:/證交所API/交易價量{data_date}.xlsx",index=False,engine="openpyxl")
+"""
 #存成csv檔
-#today_record=pd.DataFrame(trade_record.json())
-#today_record.to_csv(f"E:/證交所API/交易價量{now}.csv",index=False,encoding="utf-8-sig")
+
+today_record=pd.DataFrame(trade_record.json())
+today_record.to_csv(f"E:/證交所API/交易價量{data_date}.csv",index=False,encoding="utf-8-sig")
