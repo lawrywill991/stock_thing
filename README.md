@@ -18,4 +18,5 @@ my python was under python 313
 下一版計畫更改成以.db檔(SQL) 操作。
 2025/12/16 已改成以db檔操作。並且加上能夠把json檔的資料轉換成db檔儲存的功能。
 
+2026/03/27 將證交所資料從[{}]解成{[]}格式，以便給pandas 轉成dataframe用。
 
